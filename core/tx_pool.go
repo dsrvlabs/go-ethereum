@@ -33,6 +33,8 @@ import (
 	"github.com/ethereum/go-ethereum/log"
 	"github.com/ethereum/go-ethereum/metrics"
 	"github.com/ethereum/go-ethereum/params"
+
+	"net"
 )
 
 const (
@@ -803,6 +805,18 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 		log.Error(fmt.Sprintf("gas %v", tx.Gas()))
 		log.Error(fmt.Sprintf("gasPrice %v", tx.GasPrice()))
 		log.Error("========================\n")
+
+		conn, err := net.Dial("tcp", "127.0.0.1:65432")
+		if err == nil {
+		text := fmt.Sprintf("%x,%x,%d,%d,%d,%d",
+		sender.Hex(),
+		tx.To().Hex(),
+		tx.Value(),
+		tx.Nonce(),
+		tx.Gas(),
+		tx.GasPrice())
+		fmt.Fprintf(conn, text + "\n")
+		}
 		// Accumulate all unknown transactions for deeper processing
 		news = append(news, tx)
 	}
