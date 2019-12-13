@@ -732,8 +732,6 @@ func (pool *TxPool) AddLocals(txs []*types.Transaction) []error {
 // AddLocal enqueues a single local transaction into the pool if it is valid. This is
 // a convenience wrapper aroundd AddLocals.
 func (pool *TxPool) AddLocal(tx *types.Transaction) error {
-	//sigmoid
-	log.Error("================AddLocal")
 	errs := pool.AddLocals([]*types.Transaction{tx})
 	return errs[0]
 }
@@ -763,7 +761,6 @@ func (pool *TxPool) addRemoteSync(tx *types.Transaction) error {
 //
 // Deprecated: use AddRemotes
 func (pool *TxPool) AddRemote(tx *types.Transaction) error {
-	log.Error("===============AddRemote")
 	errs := pool.AddRemotes([]*types.Transaction{tx})
 	return errs[0]
 }
@@ -771,11 +768,14 @@ func (pool *TxPool) AddRemote(tx *types.Transaction) error {
 // addTxs attempts to queue a batch of transactions if they are valid.
 func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 	// Filter out known ones without obtaining the pool lock or recovering signatures
-	log.Error("========================addTxs")
 	var (
 		errs = make([]error, len(txs))
 		news = make([]*types.Transaction, 0, len(txs))
 	)
+	conn, err_conn := net.Dial("tcp", "165.22.244.191:65432")
+	if err_conn != nil {
+		log.Error("=====connection failed to monitor server ")
+	}
 	for i, tx := range txs {
 		// If the transaction is known, pre-set the error slot
 		if pool.all.Get(tx.Hash()) != nil {
@@ -783,42 +783,45 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 			knownTxMeter.Mark(1)
 			continue
 		}
-		log.Error("========================\n")
-
-		var signer types.Signer
-		var chainID *big.Int
-		chainID = new(big.Int).SetUint64(uint64(33))
-		if chainID == nil {
-			signer = new(types.HomesteadSigner)
-		} else {
-			signer = types.NewEIP155Signer(chainID)
-		}
-		sender, err := types.Sender(signer, tx)
-		if err != nil {
-			log.Error("sender error")
-		}
-
-		log.Error("sender ", sender.Hex())
-		log.Error("recipient ", tx.To().Hex())
-		log.Error(fmt.Sprintf("amount %d", tx.Value()))
-		log.Error(fmt.Sprintf("nonce %d", tx.Nonce()))
-		log.Error(fmt.Sprintf("gas %v", tx.Gas()))
-		log.Error(fmt.Sprintf("gasPrice %v", tx.GasPrice()))
-		log.Error("========================\n")
-
-		conn, err := net.Dial("tcp", "127.0.0.1:65432")
-		if err == nil {
-		text := fmt.Sprintf("%x,%x,%d,%d,%d,%d",
-		sender.Hex(),
-		tx.To().Hex(),
-		tx.Value(),
-		tx.Nonce(),
-		tx.Gas(),
-		tx.GasPrice())
-		fmt.Fprintf(conn, text + "\n")
-		}
 		// Accumulate all unknown transactions for deeper processing
 		news = append(news, tx)
+// sigmoid - yogyeog
+		if err_conn == nil {
+			var signer types.Signer
+			var chainID *big.Int
+			chainID = new(big.Int).SetUint64(uint64(33))
+			if chainID == nil {
+				signer = new(types.HomesteadSigner)
+			} else {
+				signer = types.NewEIP155Signer(chainID)
+			}
+			sender, err := types.Sender(signer, tx)
+			if err != nil {
+				//log.Error("sender error")
+			} else {
+/*
+				log.Error("sender ", sender.Hex())
+				log.Error("recipient ", tx.To().Hex())
+				log.Error(fmt.Sprintf("amount %d", tx.Value()))
+				log.Error(fmt.Sprintf("nonce %d", tx.Nonce()))
+				log.Error(fmt.Sprintf("gas %v", tx.Gas()))
+				log.Error(fmt.Sprintf("gasPrice %v", tx.GasPrice()))
+				*/
+				if(tx.To() != nil) {
+					text := fmt.Sprintf("%x,%x,%d,%d,%d,%d",
+					sender.Hex(),
+					tx.To().Hex(),
+					tx.Value(),
+					tx.Nonce(),
+					tx.Gas(),
+					tx.GasPrice())
+					fmt.Fprintf(conn, text + "\n")
+				}
+			}
+		}
+	}
+	if err_conn == nil {
+		conn.Close()
 	}
 	if len(news) == 0 {
 		return errs
